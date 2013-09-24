@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<head>
+ <script type="text/javascript" src="js/jquery-1.9.1.min.js"></script>
+ <link href='js/mapbox/mapbox.css' rel='stylesheet' />
+ <!--[if lte IE 8]>
+ <link href='http://api.tiles.mapbox.com/mapbox.js/v1.0.0/mapbox.ie.css' rel='stylesheet' />
+ <![endif]-->
+ <script type="text/javascript" src="jquery-ui/jquery-ui.js"></script>
+ <script type="text/javascript" src="bootstrap/js/bootstrap.js"></script>
+ <link rel="stylesheet" href="jquery-ui/themes/base/jquery-ui.css"/>
+ <link rel="stylesheet" href="bootstrap/css/bootstrap.css"/>
+ <script src='js/mapbox/mapbox.uncompressed.js'></script>
+ <script src='js/indoor.js'></script>
+ <style>
+
+
+td { 
+ vertical-align: top;
+ font-family: 'Courier New';
+ font-size: 13px; 
+}
+
+td:last-child {
+  font-family: 'Helvetica Neue';
+}
+
+td:nth-child(2) {
+ width: 25%;
+}
+
+tr td:last-child {
+  width: 50%;
+}
+
+
+
+th {
+  text-align: left;
+}
+
+#footer {
+  padding-top: 30px;
+  background: #ddd;
+}
+
+div#example_wrapper {
+  background: url('grey_wash_wall/grey_wash_wall.png');
+  position: relative; 
+  width: 100%; 
+  padding-top: 60px;
+  padding-bottom: 5px;
+}
+
+span.code {
+  font-family: 'Courier New';
+}
+
+div.well {
+ font-family: 'Courier New';
+}
+
+span.label {
+ font-size: 16px; 
+ font-weight: bold;
+ background: white;
+ color: black;
+ margin-left: -3px;
+ margin-right: 10px;
+ 
+} 
+
+body {
+  margin:0; padding:0;
+}
+    .map_container {
+      width: 50%; 
+      float: right;
+    }
+    .legend {
+ 	display: inline;
+	position: absolute;
+	width: 20%;
+	z-index: 999;
+ 	margin-left: 70%;
+    	height: 400px;
+	padding: 10px;
+	background: url('debut_light/debut_light.png');
+ 	box-shadow: 0px 0px 10px black;
+ 	border-bottom-right-radius: 10px;
+ 	border-top-right-radius: 10px;
+	/*
+font-family: 'effra';
+*/
+    }
+.map { 
+  overflow: hidden;
+  box-shadow: 0px 0px 10px black; 
+  position: relative;
+  width: 60%;
+  margin-left: 10%;
+  height: 420px; 
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px; 
+}
+
+.header1  {
+  text-align: center;
+  margin-top: 20px;
+  padding-top: 20px;
+  margin-left: 70px;
+  margin-right: 70px;
+/*
+  font-family: 'bello-pro';
+*/
+  font-size: 50px;
+  color: white;
+  text-shadow: 0px 1px 0px black;
+  margin-bottom: 20px;
+  line-height: 60px; 
+}
+
+#store_page {
+
+}
+
+#static_map_wrapper {
+  background: url('grey_wash_wall/grey_wash_wall.png');
+  text-align: center;
+  padding: 20px;
+}
+
+#legend_hover_wrapper {
+ display: none;	
+}
+
+#static_map {
+ width: 200px; 
+ height: 200px;
+ margin: 0 auto;
+}
+
+.header2 {
+  text-align: center;
+  font-family: 'effra';
+  font-size: 30px;
+  color: #eee;
+  text-shadow: 0px 1px 0px black;
+  margin-bottom: 40px;
+}
+
+textarea {
+  width: 100%;
+  font-family: 'Courier New';
+  height: auto;
+}
+
+#map_explanation {
+  position: relative;
+  margin-right: 10%;
+  text-align: right;
+  color: white; 
+  font-size: 11px;
+  margin-bottom: 30px;
+}
+
+h3 {
+/*  background-image: linear-gradient(to bottom, #0088cc, #0044cc);
+  background-image: linear-gradient(to bottom, #4477bb, #4455bb);
+*/  color: #0088cc;
+  border-radius: 3px;
+  font-weight: normal;
+  margin-right: 0px;
+  margin-top: 20px;
+  font-weight: bold;
+}
+  </style>
+</head>
+<body>
+<script>
+function gup( name ) {
+  name = name.replace(/[\[]/,"\\\[").replace(/[\]]/,"\\\]");
+  var regexS = "[\\?&]"+name+"=([^&#]*)";
+  var regex = new RegExp( regexS );
+  var results = regex.exec( window.location.href );
+  if( results == null )
+    return "";
+  else
+    return results[1];
+}
+
+var map_id = gup('m');
+if(map_id.length == 0) map_id = 
+'01398388384841382506';
+//'04814776999410242017';
+var project_id = gup('p');
+if(project_id.length == 0) project_id = 'export_130920_0080864409';
+//export_130920_0528916263'; 
+//'export_130920_0660803081';
+//export_13099_0372947902';
+//export_13099_0372947902';
+//'export_0420369958';
+//export_0802327340';
+//export_0114057001';
+//export_0884165054';
+
+
+var map;
+var lastLine = null;
+var prevLatLng = null;
+
+var stores = {
+  '150': {name: 'Anttila'},
+  '152': {name: 'Stockmann'},
+  '157': {name: 'Jack &amp; Jones'}
+};
+var storePopup = null;
+
+var myLocation = null;
+</script>
+
+<script type="text/javascript">
+function runPreScripts() {
+ var script = '';
+ $("textarea").each(function(index, element) {
+  var part = $(element).text();
+  script = part.replace(/<\/?[a-zA-Z]{1}>/g ,'') + script;
+  $(element).replaceWith('<div class="well">'+
+    part
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>')
+      .replace(/&lt;b&gt;/g, '<b>')
+      .replace(/&lt;\/b&gt;/g, '</b>')
+      .replace(/ /g, '&nbsp;')
+    +'</div>');
+  $(element).height(element.scrollHeight);
+ });
+ var scriptElement = document.createElement('script');
+ scriptElement.innerHTML = script;
+ document.body.appendChild(scriptElement);
+}
+window.addEventListener('load', runPreScripts, false);
+
+
+
+</script>
+<!--
+<div id="spacer" style="margin-bottom: 680px;">
+</div>
+-->
+<div class="row" style="background: white; ">
+<div class="span1" style="width: 113px;"></div>
+<div class="span11" style="padding: 10px;">
+<div class="page-header"><h1>indoor.js <small>indoor.io JavaScript API</small></h1>
+</div>
+<div class="row">
+<div class="span3">
+<strong>Beginner's guide to indoor.js</strong>
+<ul class="nav">
+<li><a href="#guide-libs">Including libraries</a></li>
+<li><a href="#guide-creation">Map Creation</a></li>
+<li><a href="#guide-interaction">Map Interaction</a></li>
+<li><a href="#guide-features">Feature highlighting</a></li>
+<li><a href="#guide-routes">Routes</a></li>
+<li><a href="#guide-dragging">Dragging marker to the map</a></li>
+<li><a href="#guide-static">Creating a static map view</a></li>
+</ul>
+</div>
+<div class="span3">
+<strong>API documentation</strong>
+<ul class="nav">
+<li><a href="#L.indoor">indoor.js API structure</a></li>
+<li><a href="#L.indoor.map">L.indoor.map</a></li>
+<li><a href="#L.indoor.feature">L.indoor.feature</a></li>
+<li><a href="#L.indoor.latLng">L.indoor.latLng</a></li>
+
+</ul>
+</div>
+<div class="span3">
+<strong>Base APIs</strong>
+<ul class="nav">
+<li><a href="http://www.leafletjs.com">Leaflet API</a></li>
+<li><a href="http://www.mapbox.com/mapbox.js">Mapbox.js API</a></li>
+</ul>
+</div>
+<div class="span3">
+<strong>Browser support</strong>
+<ul class="nav">
+<li><a href="#browser-desktop">Desktop browsers</a></li>
+<li><a href="#browser-mobile">Mobile browsers</a></li>
+</ul>
+</div>
+<div class="span3">
+<strong>About indoor.io</strong>
+<ul class="nav">
+<li><a href="http://indoor.io">Website</a>
+</li>
+</ul></div>
+
+</div>
+
+</div>
+</div>
+</div>
+
+<div id='example_wrapper'>
+<!--
+<div class='header1'>indoor.js: beautiful embeddable 2.5D maps</div>
+-->
+<!--<div class='header2'>With great cross-platform support</div>-->
+
+ <div class='legend'>
+<h4 id='legend_hover_wrapper'>You did move your mouse on  
+ <span id='legend_hover'>
+ </span>
+</h4>
+
+  <div style='border-top: solid 1px grey; margin-top: 5px; position: absolute; bottom: 10px; right: 10px; left: 10px;'> 
+   <img id='drag_icon' src='marker-icon.png' style='float: left; margin: 4px;'/> Drag the marker on the map to define your position.
+  </div>
+ </div>
+ <div id='map' class='map'></div>
+<div id='map_explanation'>This map example and its interactions are created by executing the below script examples.</div>
+</div>
+
+<div class="row" style="background: white; ">
+<div class="span1" style="width: 113px;"></div>
+<div class="span11" style="padding: 10px;">
+
+<div class="page-header"><h2>Beginner's guide to indoor.js</h2></div>
+<a id="guide-terms"></a>
+<h3>Used Terms</h3>
+<p><span class='label'>Map identifier</span><br/> An identifier generated by indoor.io mapper tools. This identifier specifies a single destination with multiple floors.</p>
+<p><span class='label'>Project identifier</span><br/> An identifier generated by indoor.io mapper tools during an export process. Indoor.io tools provide means to export 
+a 3D map to formats used by web maps. This identifier specifies a single result of such an export process.</p>
+
+<a id="guide-libs"></a>
+<h3>Including libraries</h3>
+<p>
+In order to use indoor.js, you have to include two libraries: mapbox.js and indoor.js. This can be done by adding the following
+lines to the &lt;head&gt; element of the HTML page:
+<div class="well">
+&lt;link href='http://indoor.io/indoor.js/1.0.0/js/<b>mapbox/mapbox.css</b>' rel='stylesheet' /&gt;<br/>
+&lt;script src='http://indoor.io/indoor.js/1.0.0/js/<b>mapbox/mapbox.js</b>'>&lt;/script><br/>
+&lt;script <br/>
+&nbsp;&nbsp;src='http://tiles.indoor.io/export/web/<b><i>&lt;map identifier&gt;</i>/<i>&lt;project identifier&gt;</i>/indoor.js</b>'<br/>
+&lt;/script&gt;<br/>
+</div>
+where <b><i>&lt;map identifier&gt;</i></b> must be replaced by the actual map identifier and
+<b><i>&lt;project identifier&gt;</i></b> must be replaced by the actual project identifier.
+
+</p><p>
+mapbox.js is an open source library maintained by mapbox.com. You can read its license <a href="https://raw.github.com/mapbox/mapbox.js/v1/LICENSE.md">here</a>.
+</p>
+<a id="guide-creation"></a>
+<h3>Map Creation</h3>
+
+<p>
+In this example, we create a new map using a predefined map identifier, a predefined project identifier, and two callback functions (for clicks and hovering) that are defined later. 
+</p>
+<p>
+Third parameter is undefined; it could be an object that would be passed to the L.mapbox.map constructor. 
+</p>
+<p>
+Fourth parameter is a callback function, which is called when the map has been loaded. In our case, we fade the map in and highlight certain stores. 
+</p>
+
+</p><textarea>
+function go() {
+  // let's create a map
+  <b>map = L.indoor.map('map', { 
+      map: map_id, 
+      project: project_id, 
+      click: indoorMapClicked, 
+      hover: indoorMapHovered
+    }, 
+    null, 
+    function() {</b>
+      // if we wanted to show initially a specific level, we could do it here!
+      // var levels = map.getLevels();
+      map.setLevel('1');
+
+      // instead, let's highlight some stores
+      highlightSomeFeatures();
+
+      // enable marker dragging; let's come back to this later
+      enableMarkerDragging();
+   <b> });</b>
+}
+
+go();
+</textarea>
+<a id="guide-interaction"></a>
+<h3>Map Interaction</h3>
+<p>
+<strong>All basic map interaction is done using <a href="http://www.leafletjs.com">Leaflet API functions.</a></strong> These include map <strong>markers, dragging, panning, zooming, boundaries</strong>, page offset to LatLng conversions, and more. 
+Also, you can use it to add additional <strong>tile layers</strong>, or custom <strong>canvas overlays</strong>.
+Please see <a href="http://www.leafletjs.com">Leaflet API</a> documentation for more details.</p>
+<p>
+Markers whose locations are of type L.indoor.latLng (ie. they have a level property), will be automatically hidden and shown when changing levels.
+</p>
+<p>In the constructor function, two callback functions were given: indoorMapClicked for map clicks and indoorHovered for mouse moves. 
+</p>
+<p>The callback functions (given to the constructor function) have one argument with the following properties: 
+<ul>
+<li><strong>event.feature</strong>: a L.indoor.feature object 
+</li>
+<li><strong>event.latLng</strong>: a L.indoor.latLng object 
+</li></ul>
+<h4>Example of a click callback</h4>
+<p>In the example functions below, clicks to stores open a popup with a link to store info and a route button. Clicks outside stores 
+only open a popup with a route button.</p>
+<p>
+
+<textarea>
+var storeHighlight = null;
+var storePopup = null;
+
+<b>function indoorMapClicked(event) {</b>
+  // uncomment this row to see some logging of the feature properties
+  // if(event.feature) console.log(JSON.stringify(event.feature.geometry));
+  // only do this if a known feature (that has a store id that we know) 
+  if(<b>event.feature</b> && event.feature.properties.store && stores[event.feature.properties.store]) {
+    if(storeHighlight) {
+      // clear earlier highlights
+      <b>map.clearHighlight(storeHighlight);</b>
+      storeHighlight = null;
+    }
+
+    // if there is an existing click popup, remove it
+    if(storePopup && map.hasLayer(storePopup)) map.removeLayer(storePopup);
+
+    <b>storeHighlight = map.highlightFeatures(<b>event.feature</b>, {stroke: true, color: '#00ff00'});</b>
+    
+    // let's create a popup (using Leaflet API)
+    storePopup = L.popup()
+      .setLatLng(event.latLng)
+      .setContent(
+        // add a title
+        '<h4>'+stores[event.feature.properties.store].name+'</h4>'+
+        // add a store info button
+        '<center>'+
+        '<button class="btn btn-primary" '+
+           'onclick="showRoute(\''+
+             event.feature.properties.store+'\', '+
+             event.latLng.lat+', '+
+             event.latLng.lng+');">'+
+           'Find route'+
+        '</button>'+
+        '</center>')
+      .addTo(map);
+  } else {
+    var storePopup = L.popup()
+        .setLatLng(event.latLng)
+        .setContent(
+          '<center>'+
+          '<button class="btn btn-primary" '+
+            'onclick="showRoute(undefined, '+
+              event.latLng.lat+', '+
+              event.latLng.lng+');">Find route</button></center>')
+        .addTo(map);
+  }
+return;
+}
+</textarea>
+<h4>Example of a hovering callback</h4>
+<textarea>
+var hoverHighlight = null;
+var hoveredFeature = null;
+
+function indoorMapHovered(event) {
+  // uncomment this row to see some logging of the feature properties
+  // if(<b>event.feature</b>) console.log(JSON.stringify(event.feature.properties));
+  if(<b>event.feature</b>) {
+    if((hoveredFeature && hoveredFeature.properties.featureIdentifier != event.feature.properties.featureIdentifier) || !hoveredFeature) {
+      if(hoverHighlight) map.clearHighlight(hoverHighlight);
+      hoverHighlight = map.highlightFeatures(event.feature, {clickable: false, stroke: true, color: '#ffffff', opacity: '0.3'});
+      hoveredFeature = event.feature;
+    } else {
+    
+    }
+    if(event.feature.properties.name) $("#legend_hover").empty().append(event.feature.properties.name);
+    else $("#legend_hover").empty().append('an unnamed area');
+    $("#legend_hover_wrapper").fadeIn();
+  }
+}
+</textarea>
+
+<a id="guide-features"></a>
+<h3>Feature highlighting</h3>
+<p>
+Features are highlighted by calling map.highlightFeatures function, which accepts both single features and arrays of features. 
+Feature highlights can be styled with any L.Path styles. The highlighting is done by adding a L.Polygon layers to the map.
+</p>
+<p>There are two sources for L.indoor.feature objects: 
+<ul><li>map.getFeatures function</li>
+<li>map mouse events given in the constructor of the map object</li>
+</ul>
+
+</p>
+<h4>Matching features with a regular expression</h4>
+<p>
+In this example, getFeatures is called with an object with a store property. This store property was set to certain features in the indoor.io mapping tools. 
+</p><p>The regular expression matches all 3-digit values starting with 1. 
+</p>
+<textarea>
+function highlightFeaturesByRegexp() {
+  // let's search with a reg exp that matches all features with a store value 140-149
+  // but let's exclude those whose store info we know in an external array (stores)
+  // and highlight the results with a blue color
+
+  <b>map.getFeatures({store: /14[0-9]{1}/}, function(error, features) {</b>
+    <b>map.highlightFeatures</b>(features, {
+      clickable: false,
+      stroke: true,
+      fillColor: '#0000ff',
+      fill: true,
+      color: '#0000ff'
+    });	
+  });
+}
+</textarea>
+<!--
+<h4>Matching features with a custom matching function</h4>
+<p>
+In this example, there's an external database that is represented by the variable 'stores'. Those stores that are in the database are highlighted. 
+</p><p>
+Any comparisons or actions can be done in the function.
+</p>
+<textarea>
+function highlightFeaturesByFunction() {
+  // search for those stores whose store info we know in an external array (stores)
+  // and highlight the matching features with white and red
+  <b>map.getFeatures(function(feature) {</b>
+    if(!stores[feature.properties.store]) return;
+    <b>map.highlightFeatures(feature, {</b>
+      clickable: false,
+      stroke: true,
+      fillColor: '#ffffff',
+      fill: true,
+      color: '#ff0000',
+      weight: 1,
+      fillOpacity: 0.5,
+      opacity: 0.5
+    });
+  });
+}
+</textarea>
+-->
+<h4>Matching features with a property value</h4>
+<p>
+In this example, we use a simple property value to match and highlight features.
+</p>
+<textarea>
+function highlightFeaturesByPropertyValue() {
+  // search and highlight those features that are on level 2
+  map.getFeatures({level: '2', store: /.+/}, function(error, features) {</b>
+    <b>map.highlightFeatures(features, {
+      clickable: false,
+      stroke: true,
+      fillColor: '#0000ff',
+      fill: true,
+      color: '#00ff00'
+    });
+  // if we wanted to zoom to specified feature 
+  // map.fitFeatures(results[0]);
+  });
+}
+</textarea>
+<h4>Adding an external feature</h4>
+<p>
+In this example, we have got a WGS84 location from an imaginary data source. 
+</p>
+<p>
+Since the indoor maps may be shown in a virtual coordinate system, normal WGS84 coordinates must be converted to the right coordinate system before using them to add layers or markers.
+</p>
+<textarea>
+function addAnExternalFeature() {
+  // let's add a marker to a WGS84 location. we have to convert the location first
+  // because we are working in a virtual coordinate system
+  <b>map.convertLatLng(new L.LatLng(60.210388,25.080092), function(error, latLng) {</b>
+    // we can use plain Leaflet API now
+    var icon = new L.Icon({
+      iconUrl: 'marker-icon.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      shadowUrl: 'marker-shadow.png'});
+    map.addLayer(new L.Marker(latLng, {icon: icon}));
+  });
+ 
+}
+</textarea>
+<p>Finally, let's call all these functions when the map has been loaded. </p>
+<textarea>
+function highlightSomeFeatures() {
+  highlightFeaturesByRegexp();
+  highlightFeaturesByPropertyValue();
+  
+  map.getFeatures({store: '152'}, function(error, stores) {
+    for(var i in stores) {
+      var icon = new L.DivIcon({html: 'Anttila'});
+      var marker = new L.Marker(stores[i].properties.markerLocation, {className: 'textIcon', icon: icon});
+      map.addLayer(marker);
+    }
+  });
+  map.getFeatures({text: /.*/}, function(error, texts) {
+
+  for(var i in texts) {
+    var icon = new L.DivIcon({html: texts[i].properties.text});
+    var marker = new L.Marker(texts[i].properties.markerLocation, {className: 'textIcon', icon: icon});
+    map.addLayer(marker);
+  }
+  });
+
+  map.getFeatures({icon: /.*/}, function(error, icons) {
+    for(var i in icons) {
+      var icon = new L.DivIcon({html: icons[i].properties.icon});
+      var marker = new L.Marker(icons[i].properties.markerLocation, {className: 'textIcon', icon: icon});
+      map.addLayer(marker);
+    }
+  });
+
+  addAnExternalFeature();
+}
+</textarea>
+
+<a id="guide-routes"></a>
+
+<h3>Routes</h3>
+<p>In this example, the user drags a marker icon to the map. That marker defines the start location. The destination is based on user clicks on the map. 
+</p><p>
+The route calculation is done asynchronously over the network, so it's good to show a spinner until we have the route at hand. 
+</p>
+<textarea>
+function showRoute(id, lat, lng) {
+  if(storePopup && map.hasLayer(storePopup)) map.removeLayer(storePopup);
+  if(myLocation!= null) {
+    // let's add a spinner for the route calculation time
+    var spinner = new L.Marker(
+      new L.LatLng(lat, lng), {
+        icon: new L.Icon({
+        iconUrl: 'images/spinner.gif', 
+        iconAnchor: [20, 20], 
+        className: 'L_indoor_spinner'})})
+      .addTo(map);
+    // we like white circles with a shadow
+    $('.L_indoor_spinner')
+      .css('box-shadow', '0px 0px 10px white')
+      .css('padding-right', '2px')
+      .css('background', 'white')
+      .css('border-radius', '20px');
+
+    // let's define our destination 
+    var latLng = new L.indoor.latLng(lat, lng, map.getLevel());
+    <b>map.getRoute(myLocation, latLng, function(error, route) {</b>
+      if(error || route.length == 0) {
+        map.removeLayer(spinner);
+        alert('Route calculation was unsuccessful');
+      } else {
+        map.removeLayer(spinner);
+        if(lastLine) <b>map.hideRoute(lastLine);</b>
+        lastLine = <b>map.showRoute(route, {</b>
+	  startIcon: null, 
+	  endIcon: new L.Icon.Default(), 
+	  animate: true, 
+	  animateIcon: new L.Icon.Default(), 
+	  lineOptions: {color: '#000033', opacity: 1, dashArray: '5,1', weight: 10}
+	});
+      }
+    });
+  } else {
+    alert('Please define your position first by dragging the blue marker on the map.');
+  }
+  prevLatLng = event.latLng;
+}
+</textarea>
+
+<a id="guide-dragging"></a>
+<h3>Dragging marker to the map</h3>
+<p>In this example, jQuery UI is utilized to create a draggable icon to the side panel. We implement two event callback functions of the draggable object (start and stop). 
+In the start function, we save the icon offset. In the stop function, we calculate the pixel coordinate of the dropping location. Then, we call containerPointToLatLng function of <a href="http://leafletjs.com/reference.html#map-conversion-methods">L.Map</a>.
+</p>
+<textarea>
+// posMarker contains the latest position of the location marker
+var posMarker = null;
+// iconOffset stores the offset in the source icon
+var iconOffset = null;
+
+
+function enableMarkerDragging() {
+  // this is a jQuery UI function
+  $("#drag_icon").draggable({
+    helper: function(event) {
+      return '<img id="drag_helper" style="z-index: 99999;" src="marker-icon.png"/>';
+    }, 
+    start: function(event, element) {
+      iconOffset = {left: $(event.target).width()/2, top: $(event.target).height()};
+    },
+    stop: function(event, element) {
+      var offset = element.offset;
+      var mapOffset = $("#map").offset();
+      offset.left -= mapOffset.left;
+      offset.top -= mapOffset.top;      
+
+      if(offset.left < $("#map").width() && offset.top < $("#map").height()) {
+        if(posMarker && map.hasLayer(posMarker)) map.removeLayer(posMarker);
+        var latLng = map.containerPointToLatLng(
+          new L.Point(
+            offset.left+iconOffset.left, 
+            offset.top+iconOffset.top)); 
+        myLocation = latLng;
+        myLocation.level = map.getLevel();25,41
+        var icon = new L.Icon({iconUrl: 'marker-icon.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          shadowUrl: 'marker-shadow.png'});
+        posMarker = new L.Marker(latLng, {icon: icon}).addTo(map);
+      }
+    }
+  });
+}
+</textarea>
+<a id="guide-static"></a>
+<h3>Creating a static map view</h3>
+<p>In this example, we create a static map view that shows a feature whose 'store' property is '148'. 
+</p><p>This is achieved by simply disabling all controls and actions: level control, zoom control, dragging and different zooms. 
+</p>
+<div id='static_map_wrapper' style="position: relative;">
+<button class="btn btn-large btn-primary" style="position: absolute; left: 40%; width: 20%; margin-bottom: 10px;" id="thumbnailButton" onclick="createThumbnail()">Create a thumbnail map</button>
+<div id='static_map'></div>
+</div>
+<textarea>
+function createThumbnail() {
+  $("#thumbnailButton").replaceWith(
+    '<img src="images/spinner.gif" '+
+       'id="static_spinner" '+
+       'style="position: absolute; border-radius: 20px; box-shadow: 0px 0px 10px white;"/>');
+  // let's create a new map
+  var static_map = L.indoor.map('static_map', {
+    map: map_id,
+    project: project_id,
+    <b>levelControl: false</b> // hides the level control
+  }, {
+    <b>dragging: false, </b>// disables mouse dragging
+    <b>touchZoom: false, </b>// disables touch zooming
+    <b>boxZoom: false, </b>// let's disable every zoom
+    <b>scrollWheelZoom: false,
+    doubleClickZoom: false,
+    zoomControl: false</b>
+  }, function() {
+    $("#static_spinner").remove();
+
+    // now the map has been loaded; look for a feature and highlight it.
+    var features = static_map.getFeatures({store: '148'});
+    static_map.fitFeatures(features);
+    static_map.highlightFeatures(features, {clickable: false, fill: true, fillColor: '#ff0000'});
+  });
+}
+</textarea>
+<a id="L.indoor"></a>
+<div class="page-header"><h2>API documentation</h2></div>
+<h3>indoor.js API structure</h3>
+<p>The indoor.js API wraps Mapbox.js API (<a href="http://mapbox.com/mapbox.js">documentation</a>) which again wraps Leaflet API (<a href="http://leafletjs.com/">documentation</a>). 
+<p>The indoor.js API defines a few new data structures: 
+<ol>
+<li>L.indoor.map, a new base class for maps</li>
+<li><a href="#L.indoor.feature">L.indoor.feature</a>, a data structure for tagged map features (stores, areas, etc.)</li>
+<li><a href="#L.indoor.latLng">L.indoor.latLng</a>, a data structure for locations that adds a level property to L.LatLng</lI>
+</ol>
+</p>
+<p>indoor.js always uses 2.5D. The map above is a 2.5D representation of the map. It uses a single point of view to show a prerendered view of the building.</p>
+
+<a id="L.indoor.map"></a>
+<h3>L.indoor.map</h3>
+<p>The main map class is named L.indoor.map. Using pure Leaflet API, you would create a map object by calling 'new L.Map(args)'. Using Mapbox.js API, you call 'L.mapbox.map(args)'.
+Using indoor.js, you call 'L.indoor.map(args)'. 
+</p>
+<h4>Constructor</h4>
+A new L.indoor.map instance is created by calling the function L.indoor.map (do not use 'new' keyword): 
+<div class="well">
+var map = L.indoor.map('map', {map: '098234...', project: 'acd3234...', click: clicked, hover: hovered}, null, initView);
+</div>
+<table  class="table table-bordered table-hover">
+<tr><th>Parameter</th><th>Description</th></tr>
+<tr><td>&lt;String&gt; elementId</td><td>The id of the DOM element of the map</td></tr>
+<tr><td>&lt;Object&gt; indoorIoOptions</td><td>An object with the following properties: 
+<ul>
+<li>&lt;String&gt; <strong>map</strong>: a map identifier as given from indoor.io mapper tools</li>
+<li>&lt;String&gt; <strong>export</strong>: a map export identifier as given from indoor.io mapper tools</li>
+<li>&lt;function(event)&gt; <strong>click</strong>: a callback function that is called at the moment of a mouseclick.</li>
+<li>&lt;function(event)&gt; <strong>hover</strong>: a callback function that is called at the moment of a mousemove event</li>
+</ul>
+</td></tr>
+</td></tr>
+<tr><td>&lt;Object&gt; mapboxJsOptions</td><td>An options object that will be passed to L.mapbox.map constructor. </td></tr>
+<tr><td>&lt;function()&gt; callback</td><td>This callback function will be called when the indoor map has been successfully loaded and initialized.</td></tr>
+</table>
+<h4>Callback functions</h4>
+<p>The callback functions (given to the constructor function) have one argument with the following properties: 
+<ul>
+<li><strong>event.feature</strong>: a L.indoor.feature object 
+</li>
+<li><strong>event.latLng</strong>: a L.indoor.latLng object 
+</li></ul>
+
+<h4>Levels</h4>
+<table  class="table table-bordered table-hover">
+<tr><th>Method</th><th>Returns</th><th>Description</th></tr>
+<tr><td>getLevels()</td><td>String[]</td><td>Returns the names of the levels of the active map</td></tr>
+<tr><td>getLevel()</td><td>String</td><td>Returns the name of the current level</td></tr>
+<tr><td>setLevel(<String> level)</td><td>this</td><td>Changes the current level of the map. Hides markers whose location includes a level that is not equal to the new active level.
+</td>
+</table>
+<h4>Routes</h4>
+<table class="table table-bordered table-hover">
+<tr><th colspan="2">Method</th><th>Returns</th><th>Description</th></tr>
+<tr><td>getRoute(</td><td>&lt;<a href="#L.indoor.latLng">L.indoor.latLng</a>&gt; a, <br/>&lt;<a href="#L.indoor.latLng">L.indoor.latLng</a>&gt; b, 
+<br/>&lt;function(error, &lt;<a href="#L.indoor.latLng">L.indoor.latLng</a>[]> route)> callback)</td><td>this</td><td>
+Creates a route query to indoor.io server. The error argument of the callback function is null in case of a successful route computation. The route may still be an empty array, meaning that there is no route between the given points in the geometry of the map.
+</td></tr>
+<tr><td>showRoute(</td><td>&lt;<a href="#L.indoor.latLng">L.indoor.latLng</a>[]&gt; route, <br/>&lt;Object&gt; options)</td><td>&lt;String&gt; routeIdentifier</td><td>
+Visualizes the route on the map and may animate it. Supported properties of the options object are
+<ul>
+<li>&lt;<a href="http://leafletjs.com/reference.html#icon">L.Icon</a>&gt; <strong>startIcon</strong>: the icon that is shown in the beginning of the route</li>
+<li>&lt;<a href="http://leafletjs.com/reference.html#icon">L.Icon</a>&gt; <strong>endIcon</strong>: the icon that is shown in the end of the route</li>
+<li>&lt;<a href="http://leafletjs.com/reference.html#icon">L.Icon</a>&gt; <strong>animateIcon</strong>: the icon that is shown in the animated route visualization</li>
+<li>&lt;boolean&gt; <strong>animate</strong>: enables/disables the animated route visualization</li>
+<li>&lt;<a href="http://leafletjs.com/reference.html#path-options">L.Path options</a>&gt; <strong>lineOptions</strong>: defines the style of the route line</li>
+</ul>
+The icons can be constructed as <a href="http://leafletjs.com/reference.html#icon">L.Icon</a> or <a href="http://leafletjs.com/reference.html#divicon">L.DivIcon</a>. Animated icons (using GIF images) should be implemented as L.DivIcons.
+</td></tr>
+<tr><td>hideRoute(</td><td>&lt;String> routeIdentifier)</td><td>this</td><td>Hides the route including its end, start, and animated icons and the route path. 
+</td>
+</table>
+
+<h4>Map Features</h4>
+<p>
+<strong>map.getFeatures</strong> is a function for searching features. It accepts a maximum of two arguments: a string, a RegExp, or an object, and additionally a function: 
+<ul>
+<li><strong>string</strong>: if a string is given, every feature with a property of the given value will be added to the list of resulting features</li>
+<li><strong>RegExp</strong>: if a regular expression is given, every feature with a property matching the regular expression will be added to the list of resulting features</li>
+<li><strong>object</strong>: if an object is given, every feature with matching properties will be added to the list of resulting features. The property values of the 
+parameter object may be regular expressions. </li>
+<li><strong>function(feature)</strong>: if a function is given, it will be called for each resulting feature. If the function returns false,
+the feature will be excluded from the return values. This function can also be used to work on features one by one. 
+</li>
+</ul>
+</p>
+<table class="table table-bordered table-hover">
+<tr><th colspan="2">Method</th><th>Returns</th><th>Description</th></tr>
+<tr><td>getFeatures(</td><td>&lt;string | object | RegExp&gt; searchParameters, &lt;function(&lt;L.indoor.feature&gt; feature)&gt; iteratorFunction)</td><td>&lt;<a href="#L.indoor.feature">L.indoor.feature</a>[]&gt; features</td><td>Returns the features whose data properties match the given parameters. Please see the more detailed description above. 
+</td></tr>
+<tr><td>highlightFeatures(</td><td>&lt;<a href="#L.indoor.feature">L.indoor.feature</a> | L.indoor.feature[]&gt; feature, &lt;<a href="http://leafletjs.com/reference.html#path-options">L.Path options</a>&gt; style)</td><td>&lt;String&gt; highlightId</td><td>
+Highlights the given feature(s) by drawing a polygon with the given style
+</td></tr>
+<tr><td>clearHighlight(</td><td>&lt;String&gt; highlightId)</td><td>this</td><td>Clears a highlight (either a single feature or a parametrized highlight).</td></tr>
+<tr><td>clearHighlights(</td><td>)</td><td>this</td><td>Clears all feature highlights.</td></tr>
+</table>
+
+<a name="L.indoor.feature"></a>
+<h3>L.indoor.feature</h3>
+<p>L.indoor.feature is an usual JavaScript object created internally by indoor.js and has the following properties: 
+</p>
+<table class="table table-bordered table-hover"><tr><th>Property</th><th>Description</th></tr>
+<tr><td>geometry</td><td>Defines the geometry of the feature as an array of paths (each path being an array of L.indoor.latLng objects). So this is an array of arrays of L.indoor.latLng objects. A great majority of features will always have only one path, 
+so most often a developer does <span class='code'>for(var c=0;c&lt;geometry[0].length;c++)</span> to walk through the polygon.<br/><br/>
+This property can be used to do custom stuff with the geometry, like drawing custom polygons inside the original polygon, or cutting it.</td></tr>
+<tr><td>properties</td><td>The data properties of the feature. These come from the area attributes defined in the mapper tool. In addition to those, there are also some properties that always exist: 
+<ul>
+<li>&lt;L.indoor.latLng&gt; <strong>markerLocation</strong>: a default point location of the feature. This is useful for adding store markers or finding routes to stores.
+</ul></td></tr>
+<tr><td>level</td><td>The level (as a string) of the feature</td></tr>
+</table>
+<a id="L.indoor.latLng"></a>
+<h3>L.indoor.latLng</h3>
+<p><a href="#L.indoor.latLng">L.indoor.latLng</a> is an ordinary L.LatLng object with the addition of a level property. 
+</p>
+
+<!-- map.fitArea = function(feature) {
+      var coordinates = [];
+      for(var i in feature.geometry.coordinates[0])
+        coordinates.push([feature.geometry.coordinates[0][i][1], feature.geometry.coordinates[0][i][0]]);
+      map.fitBounds(coordinates);
+    }
+
+    map.clearHighlight = function(highlight) {
+      var id = typeof highlight == 'string'? highlight : highlight.id;
+
+      if(highlights.specifiedAreas[id]) delete highlights.specifiedAreas[id];
+      if(highlights.areas[id]) delete highlights.areas[id];
+      updateFeatures();
+    }
+
+    map.highlightFeature = function(area, style) {
+      var id = Math.floor(Math.random()*Math.pow(10, 10));
+      highlights.specifiedAreas[id] = {id: id, feature: area, style: style};
+      updateFeatures();
+      return highlights.specifiedAreas[id];
+    }
+
+    map.highlightByParameters = function(parameters, style) {
+
+lastLine = map.showRoute(route, {
+            startIcon: undefined, //new L.divIcon({html: ''}),
+            endIcon: new L.Icon.Default(),
+            animate: true,
+            animateIcon: new L.Icon.Default(), //new L.divIcon({html: 'X'}),
+            lineOptions: {color: '#000033', opacity: 1, dashArray: '5,1', weight: 10}
+          });
+-->
+<div class="page-header"><h2>Browser support</h2></div>
+<p>
+indoor.js supports browsers supported by Leaflet API. 
+</p>
+<a id="browser-desktop"></a>
+<h3>Desktop browsers</h3>
+<ul>
+<li>Chrome</li>
+<li>Firefox</li>
+<li>Safari 5+</li>
+<li>Opera 11.11+</li>
+<li>IE 7-10</li>
+<li>IE 6 (partial support)</li>
+</ul>
+<a id="browser-mobile"></a>
+<h3>Mobile browsers</h3>
+<ul>
+<li>Safari for iOS 3/4/5/6+</li>
+<li>Android browser 2.2+, 3.1+, 4+</li>
+<li>Chrome for Android 4+ and iOS</li>
+<li>Firefox for Android</li>
+<li>Other webkit-based browsers (webOS, Blackberry 7+)</li>
+<li>IE10 for Windows 8 -based devices</li>
+</ul>
+</div>
+</div>
+
+<div class="row" id="footer">
+<div class="span1" style="width: 113px;"></div>
+<div class="span11" style="padding: 10px;">
+<div class="row">
+<div class="span3">
+<strong>Beginner's guide to indoor.js</strong>
+<ul class="nav">
+<li><a href="#guide-libs">Including libraries</a></li>
+<li><a href="#guide-creation">Map Creation</a></li>
+<li><a href="#guide-interaction">Map Interaction</a></li>
+<li><a href="#guide-features">Feature highlighting</a></li>
+<li><a href="#guide-routes">Routes</a></li>
+<li><a href="#guide-dragging">Dragging marker to the map</a></li>
+<li><a href="#guide-static">Creating a static map view</a></li>
+</ul>
+</div>
+<div class="span3">
+<strong>API documentation</strong>
+<ul class="nav">
+<li><a href="#L.indoor">indoor.js API structure</a></li>
+<li><a href="#L.indoor.map">L.indoor.map</a></li>
+<li><a href="#L.indoor.feature">L.indoor.feature</a></li>
+<li><a href="#L.indoor.latLng">L.indoor.latLng</a></li>
+
+</ul>
+</div>
+<div class="span3">
+<strong>Base APIs</strong>
+<ul class="nav">
+<li><a href="http://www.leafletjs.com">Leaflet API</a></li>
+<li><a href="http://www.mapbox.com/mapbox.js">Mapbox.js API</a></li>
+</ul>
+</div>
+
+<div class="span3">
+<strong>About indoor.io</strong>
+<ul class="nav">
+<li><a href="http://indoor.io">Website</a>
+</li>
+</ul></div>
+
+<div class="span3">
+<strong>Browser support</strong>
+<ul class="nav">
+<li><a href="#browser-desktop">Desktop browsers</a></li>
+<li><a href="#browser-mobile">Mobile browsers</a></li>
+</ul>
+</div>
+
+
+</div>
+
+
+</div>
+</div>
+</div>
+
+</body>
+</html>
+
