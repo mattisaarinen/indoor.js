@@ -603,7 +603,7 @@ L.indoor =
 	    if(feature.properties['_referenceLocation']) {
 	      var ref_loc = feature.properties['_referenceLocation'].split(',');
 	      delete feature.properties['_referenceLocation'];
-	      feature.properties.markerLocation = new L.LatLng(ref_loc[1], ref_loc[0], feature.properties.level);
+	      feature.properties.markerLocation = new L.indoor.latLng(ref_loc[1], ref_loc[0], feature.properties.level);
 	    }
 
 	  // if the feature is a point, it is a single vertex in the indoor.io tool
