@@ -38,7 +38,7 @@ L.indoor =
 
     }
 
-    var levelControl = false;//_.levelControl == undefined? true : _.levelControl;
+    var levelControl = _.levelControl == undefined? true : _.levelControl;
     var currentLevel = undefined; 
     var levels = {};
     var targetLevel = undefined;
@@ -339,46 +339,6 @@ L.indoor =
       }
     };
 
-    map.toggleLevelControl = function(flag) {
-
-	    if( levelControl != flag ) {
-		if( flag ) {
-		    var level_chooser = $(document.getElementById(element))
-			.find(".leaflet-top.leaflet-left #level_chooser");
-	    	    if(level_chooser.length > 0) 
-			level_chooser.remove();
-		    else 
-			$(document.getElementById(element))
-			.find(".leaflet-top.leaflet-left")
-			.append('<div id="level_chooser_title" style="font-weight: bold; font-size: 13px; color: #444; text-shadow: 0px 1px 0px white; ' + 
-				'margin-left: 10px; margin-top: 10px; margin-bottom: -8px;">Levels</div>');
-		    $(document.getElementById(element))
-			.find(".leaflet-top.leaflet-left")
-			.append('<div class="leaflet-bar leaflet-control" id="level_chooser"></div>');
-		    
-		    for(var j=0;j<loadedLevels.length;j++) {
-			$(document.getElementById('level_chooser'))
-			    .append('<a onmousemove="if(!event) event=window.event;' + 
-				    'if( event.cancelBubble ) event.cancelBubble = true;' +
-				    'if( event.stopPropagation ) event.stopPropagation(); ' + 
-				    'if( event.preventDefault ) event.preventDefault();" ' + 
-				    'onclick="if(!event) event = window.event; ' +
-				    'if( event.cancelBubble ) event.cancelBubble = true;' +
-				    'if( event.stopPropagation ) event.stopPropagation();' + 
-				    'if( event.preventDefault ) event.preventDefault();' +
-				    'map.setLevel(\'' + loadedLevels[j] + '\');" ' + 
-				    'style="font-weight: bold; cursor: hand; text-decoration: none;" ' + 
-				    'level="' + loadedLevels[j] + '">' + loadedLevels[j] + '</a>');
-		    }
-		} else {
-		    $('#level_chooser').remove();
-		    $('#level_chooser_title').remove();
-		}
-	    }
-
-	    levelControl = flag;
-    }
-	
 
     var routingId = null;
     var shownRoutes = {};
@@ -423,7 +383,7 @@ L.indoor =
       var id = Math.floor(Math.random()*Math.pow(10, 10));      
 
       for(var i in lines.levels) {
-        lines.levels[i].polyline = new L.MultiPolyline(lines.levels[i].points, options.lineOptions?options.lineOptions:{});
+        lines.levels[i].polyline = new L.MultiPolyline(lines.levels[i].points, options.lineOptions);
       }
       if(route.length > 1) {
         var properties = undefined; 
@@ -590,6 +550,7 @@ L.indoor =
       }).done(function(data) {
 	  for(var i in data) {
 	    data[i].level = data[i].level?data[i].level:data[i].l;
+	    
 	    for(var l in levels) {
 	      if(data[i].level == levels[l].levelIndex) { 
 		data[i].levelIndex = data[i].level;
@@ -647,12 +608,8 @@ L.indoor =
 		    geojson.features[f].properties.markerLocation = new L.LatLng(ref_loc[1], ref_loc[0]);
 		    geojson.features[f].properties.markerLocation.level = data.name;
 		  } 
-		  if(geojson.features[f].properties['_featureIdentifier']) {
+		  if(geojson.features[f].properties['_featureIdentifier']) 
 		    geojson.index[geojson.features[f].properties['_featureIdentifier']] = geojson.features[f];
-		    geojson.features[f].properties['featureIdentifier'] = geojson.features[f].properties['_featureIdentifier'];
-		    delete geojson.features[f].properties['_featureIdentifier'];
-
-		  }
 		  for(var c=0;c<feature.geometry.coordinates.length;c++) {
                     for(var cc=0;cc<feature.geometry.coordinates[c].length;cc++) {
                       feature.geometry.coordinates[c][cc] = 
@@ -672,7 +629,15 @@ L.indoor =
 	     }
  	    if(levelCount == project.levels.length) {
 		loadedLevels.reverse();
-		map.toggleLevelControl(true);//levelControl);
+		if(levelControl) {
+		  var level_chooser = $(document.getElementById(element)).find(".leaflet-top.leaflet-left #level_chooser");
+	    	  if(level_chooser.length > 0) level_chooser.remove();
+	          else $(document.getElementById(element)).find(".leaflet-top.leaflet-left").append('<div style="font-weight: bold; font-size: 13px; color: #444; text-shadow: 0px 1px 0px white; margin-left: 10px; margin-top: 10px; margin-bottom: -8px;">Levels</div>');
+	          $(document.getElementById(element)).find(".leaflet-top.leaflet-left").append('<div class="leaflet-bar leaflet-control" id="level_chooser"></div>');
+	          for(var j=0;j<loadedLevels.length;j++) {
+                    $(document.getElementById('level_chooser')).append('<a onmousemove="event.stopPropagation(); event.preventDefault();" onclick="event.stopPropagation();map.setLevel(\''+loadedLevels[j]+'\');" style="font-weight: bold; cursor: hand; text-decoration: none;" level="'+loadedLevels[j]+'">'+loadedLevels[j]+'</a>');
+		  }
+                }
 
 	      mapDiv.hide().css('opacity', 1).fadeIn();
 	      if(callback) {
@@ -689,10 +654,7 @@ L.indoor =
   	    }
 
 	    if(!initialCenterSet) {
-	      map.setMaxBounds(new L.LatLngBounds(new L.LatLng(data.bounds[1]-(data.bounds[3]-data.bounds[1])/2, 
-							       data.bounds[0]-(data.bounds[2]-data.bounds[0])/2), 
-						  new L.LatLng(data.bounds[3]+(data.bounds[3]-data.bounds[1])/2, 
-							       data.bounds[2]+(data.bounds[2]-data.bounds[0])/2)));
+	      map.setMaxBounds(new L.LatLngBounds(new L.LatLng(data.bounds[1], data.bounds[0]), new L.LatLng(data.bounds[3], data.bounds[2])));
 	      map.setView(new L.LatLng(data.center[1], data.center[0]), map.getMinZoom());
 	      initialCenterSet = true;
 	    }
@@ -710,7 +672,7 @@ L.indoor =
     for(var i in options) {
       instance.options[i] = options[i];
     }
-    instance._show = function() {};
+    instance.__proto__._show = function() {};
 
     if(instance.options.click) instance._click = function(event) {
      event.latLng.level = map.getLevel();
@@ -756,6 +718,3 @@ L.indoor =
   }
 };
 
-
-
-$(document).trigger('indoorjs');

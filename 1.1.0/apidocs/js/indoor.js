@@ -533,6 +533,7 @@ L.indoor =
     var levelControl = _.levelControl == undefined? true : _.levelControl;
     var currentLevel = undefined; 
     var levels = {};
+    var levelIndex = {};
     var targetLevel = undefined;
     var levelCount = 0;
     var initialCenterSet = false;
@@ -553,7 +554,7 @@ L.indoor =
 	for(var i in data.features) {
 	  var feature = data.features[i];
 	  feature.levelIndex = data.features[i].properties.level;
-	  feature.properties.level = levels[feature.levelIndex].name;
+	  feature.properties.level = levelIndex[feature.levelIndex].name;
 	  if(feature.geometry.type == 'Polygon') {
 	    for(var j in data.features[i].geometry.coordinates) {
 	      var polygon = data.features[i].geometry.coordinates[j];
@@ -778,6 +779,7 @@ L.indoor =
     }
 
     function _updateFeatures() {
+      _updateLayers();
 
       removeHighlightPolygons();
       for(var area in highlights.specifiedAreas) {
@@ -850,6 +852,12 @@ L.indoor =
         streetLayer.bringToBack();
       } catch(e) {}
      
+      updateFeatures();
+      updateRoutes();
+      return map;
+    }
+
+    function _updateLayers() {
       for(var i in map._layers) {
 	if(map._layers[i]._latlng) {
 	  if(map._layers[i]._latlng.level) {
@@ -870,9 +878,8 @@ L.indoor =
 	}
       }
 
-      updateFeatures();
-      updateRoutes();
-      return map;
+
+
     }
 
     map.setFeatureStyleFunction = function(filter) {
@@ -1170,7 +1177,7 @@ L.indoor =
       p1.level = p1.l = parseInt(levels[p1.level].levelIndex);
       p2.level = p2.l = parseInt(levels[p2.level].levelIndex);
       $.ajax({
-	url: 'http://navi.indoor.io/navi/maps/'+_.project+'/route.jsonp?'+
+	url: window.location.protocol+'//navi.indoor.io/navi/maps/'+_.project+'/route.jsonp?'+
 	  'lat1='+(p1.lat)+'&lon1='+p1.lon+'&level1='+p1.level+
 	  '&lat2='+(p2.lat)+'&lon2='+p2.lon+'&level2='+p2.level+
 	  '&callback=?',
@@ -1180,6 +1187,10 @@ L.indoor =
 	jsonp: 'callback'
       }).done(function(data) {
 	var route = [];
+	if(!data) {
+	  callback('Error in calculating route');
+	  return;
+	}
 	for(var i in data.features) {
 	  var feature = data.features[i];
 	  for(var c in feature.geometry.coordinates) {
@@ -1249,7 +1260,7 @@ L.indoor =
                 }
                 parseQuery(query, '');
 
-                $.getJSON('http://navi.indoor.io/navi/maps/' + _.project +
+                $.getJSON(window.location.protocol+'//navi.indoor.io/navi/maps/' + _.project +
                           '/search.jsonp?' + str +
                           '&callback=?')
                     .fail(function(jqXHR, textStatus, errorThrown) {
@@ -1304,7 +1315,7 @@ L.indoor =
      $.ajax({
        dataType: 'jsonp',
        jsonp: 'callback',
-       url: 'http://tile.indoor.io/export/web/'+_.map+'/'+_.project+'?callback=?'
+       url: window.location.protocol+'//tile.indoor.io/export/web/'+_.map+'/'+_.project+'?callback=?'
      }).done(function(project) {
       if(typeof project == 'string') project = JSON.parse(project);
       for(var i in project.levels) {
@@ -1326,9 +1337,9 @@ L.indoor =
 	      if(data.bounds[0] == 0 && data.bounds[1] == 0) {
 		virtualCoordinates = true;
 	      }
-
 	      levels[data.name] = data;
               levels[data.name].levelIndex = parseInt(i);	
+	      levelIndex[levels[data.name].levelIndex] = levels[data.name];
 
 	      loadedLevels[index] = data.name;
 		var levelCount = 0;

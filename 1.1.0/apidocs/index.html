@@ -10,7 +10,7 @@
  <link rel="stylesheet" href="jquery-ui/themes/base/jquery-ui.css"/>
  <link rel="stylesheet" href="bootstrap/css/bootstrap.css"/>
  <script src='js/mapbox/mapbox.uncompressed.js'></script>
- <script src='js/indoor.js'></script>
+ <script src='/indoor.js/1.1.0/js/indoor.js'></script>
  <style>
 
 
@@ -173,6 +173,15 @@ h3 {
   margin-top: 20px;
   font-weight: bold;
 }
+div.well.arial {
+  font-family: 'Arial';
+}
+
+div.leaflet-div-icon {
+ background: none;
+ border: 0;
+}
+
   </style>
 </head>
 <body>
@@ -241,6 +250,9 @@ window.addEventListener('load', runPreScripts, false);
 <div class="page-header"><h1>indoor.js <small>indoor.io JavaScript API</small></h1>
 </div>
 <div class="row">
+<div class="well arial">
+<strong>Sources available on Github!</strong> <a href="https://github.com/mattisaarinen/indoor.js">indoor.js public repository here</a>.
+</div>
 <div class="span3">
 <strong>Beginner's guide to indoor.js</strong>
 <ul class="nav">
@@ -327,15 +339,10 @@ a 3D map to formats used by web maps. This identifier specifies a single result 
 In order to use indoor.js, you have to include two libraries: mapbox.js and indoor.js. This can be done by adding the following
 lines to the &lt;head&gt; element of the HTML page:
 <div class="well">
-&lt;link href='http://indoor.io/indoor.js/1.0.0/js/<b>mapbox/mapbox.css</b>' rel='stylesheet' /&gt;<br/>
-&lt;script src='http://indoor.io/indoor.js/1.0.0/js/<b>mapbox/mapbox.js</b>'>&lt;/script><br/>
-&lt;script <br/>
-&nbsp;&nbsp;src='http://tiles.indoor.io/export/web/<b><i>&lt;map identifier&gt;</i>/<i>&lt;project identifier&gt;</i>/indoor.js</b>'<br/>
-&lt;/script&gt;<br/>
+&lt;link href='http://indoor.io/indoor.js/1.1.0/js/<b>mapbox/mapbox.css</b>' rel='stylesheet' /&gt;<br/>
+&lt;script src='http://indoor.io/indoor.js/1.1.0/js/<b>mapbox/mapbox.js</b>'>&lt;/script><br/>
+&lt;script src='http://indoor.io/indoor.js/1.1.0/js/<b>indoor.js</b>'&gt;&lt;/script&gt;<br/>
 </div>
-where <b><i>&lt;map identifier&gt;</i></b> must be replaced by the actual map identifier and
-<b><i>&lt;project identifier&gt;</i></b> must be replaced by the actual project identifier.
-
 </p><p>
 mapbox.js is an open source library maintained by mapbox.com. You can read its license <a href="https://raw.github.com/mapbox/mapbox.js/v1/LICENSE.md">here</a>.
 </p>
@@ -599,14 +606,13 @@ function highlightSomeFeatures() {
   }
   });
 
-  map.getFeatures({icon: /.*/}, function(error, icons) {
+  if(false) map.getFeatures({icon: /.*/}, function(error, icons) {
     for(var i in icons) {
       var icon = new L.DivIcon({html: icons[i].properties.icon});
       var marker = new L.Marker(icons[i].properties.markerLocation, {className: 'textIcon', icon: icon});
       map.addLayer(marker);
     }
   });
-
   addAnExternalFeature();
 }
 </textarea>
