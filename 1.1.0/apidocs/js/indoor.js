@@ -486,10 +486,36 @@ if (typeof JSON !== 'object') {
 }());
 
 
-
-/** indoor.js by Whatamap.com Ltd, 2013
-    All rights reserved.
+/**
+INDOOR.JS
 */
+
+/**
+The MIT License (MIT)
+
+Copyright (c) 2013 Whatamap.com Ltd
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
+
+// mapbox.js and Leaflet should be defined prior to running this code
+// here, let's define L.indoor property
 L.indoor = 
  {  
   latLng: function(lat, lng, level) {
@@ -499,37 +525,8 @@ L.indoor =
   },
   map: function(element, _, options, callback) {
     if(!options) options = {};
-//    if(options.legendControl == undefined) options.legendControl = false;
 
-    var mapDiv = $(document.getElementById(element));
-    mapDiv.css('opacity', 0.00001);
-    var map = new L.mapbox.map(element, undefined, options);
-   
-    var streetLayer = L.mapbox.tileLayer({
-      tiles: [window.location.protocol+'//c.tiles.mapbox.com/v3/examples.map-szwdot65/{z}/{x}/{y}.png'],
-      scheme: 'xyz',
-      version: '1.0.0',
-      center: [0, 0],
-      maxzoom: 18,
-      minzoom: 1
-    });
-
-    var virtualCoordinates = false;
-
-    map.enableStreetMap = function() {
-      if(!virtualCoordinates)  {
-        if(!map.hasLayer(streetLayer)) map.addLayer(streetLayer);
-      } else {
-        console.log('indoor.js warning: street map can\'t be enabled if the map isn\'t in a mercator projection.');
-        console.log('indoor.js warning: the projection is defined in the export process by indoor.io. please re-export.');
-      }
-    }
-
-    map.disableStreetMap = function() {
-      if(map.hasLayer(streetLayer)) map.removeLayer(streetLayer);
-
-    }
-
+    // initialize internal variables
     var levelControl = _.levelControl == undefined? true : _.levelControl;
     var currentLevel = undefined; 
     var levels = {};
@@ -539,53 +536,92 @@ L.indoor =
     var initialCenterSet = false;
     var _level = 0;
     var markerStyleFunction = undefined;
+    var mapInstanceId = parseInt(Math.random()*Math.pow(10, 10));
+    var highlightCount = 0;
+    var levelControlSet = false;
 
+    // this object holds 
+    // features: the features and their highlight styles
+    // polygons: the actual Leaflet polygon objects that are shown on the map
     var highlights = {
-      areas: {
-      }, poi: {
-      }, polygons: {
-
-      }, specifiedAreas : {}
+      polygons: {}, 
+      features : {}
     }
 
+    var virtualCoordinates = false;
+
+    // this code hides the map for a fade-in effect while having a constant layout during the map load
+    var mapDiv = $(document.getElementById(element));
+    mapDiv.css('opacity', 0.00001);
+    var map = new L.mapbox.map(element, undefined, options);
+
+    map.enableStreetMap = function() {
+      // having an empty function here to improve backwards compatibility
+      // please add a separate street map layer manually if you wish
+    }
+
+    map.disableStreetMap = function() {
+      // having an empty function here to improve backwards compatibility
+      // please add a separate street map layer manually if you wish
+    }
+
+    // this is the search function of indoor.js
     map.getFeaturesAsync = function(arg1, callback) {
-	if(!callback) return [];
+      // if there's no callback function, this is meaningless, so return
+      if(!callback) return [];
+
+      // otherwise, do a search (an ajax call)
       search(null, arg1, function(error, data) {
+        if(error != null) {
+	  // an error occurred, pass it to the callback and return an empty array for coding convenience
+	  callback(error, []);
+	  return;
+        }
+        
+	// search was ok and we may have some map features here
 	for(var i in data.features) {
 	  var feature = data.features[i];
+	  
+	  // swap level properties so that 
+	  // feature.levelIndex == the technical array index of the level in the array of levels, beginning with 0
+	  // feature.properties.level == the name of the level, to be used whenever you need to display a level name
 	  feature.levelIndex = data.features[i].properties.level;
 	  feature.properties.level = levelIndex[feature.levelIndex].name;
+
+	  // if the feature is a polygon, it is an area in the indoor.io tool
 	  if(feature.geometry.type == 'Polygon') {
+	   
+	    // convert every coordinate pair to an L.indoor.latLng object
 	    for(var j in data.features[i].geometry.coordinates) {
 	      var polygon = data.features[i].geometry.coordinates[j];
 	      for(var p in polygon) {
 	        polygon[p] = new L.indoor.latLng(polygon[p][1], polygon[p][0], data.features[i].properties.level);
 	      }
 	    }
+
+	    // if a "reference location" is defined, redefine it as feature.properties.markerLocation of type L.indoor.latLng
 	    if(feature.properties['_referenceLocation']) {
-		    var ref_loc = feature.properties['_referenceLocation'].split(',');
-		    delete feature.properties['_referenceLocation'];
-		    feature.properties.markerLocation = new L.LatLng(ref_loc[1], ref_loc[0], feature.properties.level);
-
-
+	      var ref_loc = feature.properties['_referenceLocation'].split(',');
+	      delete feature.properties['_referenceLocation'];
+	      feature.properties.markerLocation = new L.LatLng(ref_loc[1], ref_loc[0], feature.properties.level);
 	    }
+
+	  // if the feature is a point, it is a single vertex in the indoor.io tool
 	  } else if(feature.geometry.type == 'Point') {
 	    feature.properties.markerLocation = new L.indoor.latLng(
 	      feature.geometry.coordinates[1], 
 	      feature.geometry.coordinates[0],
 	      feature.properties.level);
-				
 	  }
-		
-
+	
   	  map.addFeaturesToIdIndex(data.features[i]);
 	}
 	
+	// we have now preprocessed the resulting features; let's pass it to the listener
 	callback(null, data.features);
-
-
-      })
-     return [];
+      });
+      // for not crashing apps that used the older, synchronic version, return an empty array
+      return [];
     }
 
     map.addFeaturesToIdIndex = function(features) {
@@ -601,149 +637,63 @@ L.indoor =
 	  }
 	  featuresById[feature.properties.featureIdentifier] = feature;
        }
-
     }
+
+    // having this wrapper function to improve backwards compatibility (to avoid crashes)   
     map.getFeatures = function(arg1, arg2, arg3) {
       if(arg2 && typeof arg2 == 'function') {
         map.getFeaturesAsync(arg1, arg2);
 	return;
       }
-      var iteratorFunction = typeof arg1 == 'function'? arg1 : (typeof arg2 == 'function'? arg2 : null);
-      var queryObject = typeof arg1 == 'object'? arg1 : (typeof arg2 == 'object'? arg2 : null);
-      var queryString = typeof arg1 == 'string'? arg1 : (typeof arg2 == 'string'? arg2 : null);
-      var results = [];
+    }
 
-      if(!queryString && !queryObject) {
-        for(var l in levels) {
- 	  if(levels[l] != currentLevel) continue;
-          for(var f in levels[l].geojson.features) {
-            var feature = levels[l].geojson.features[f];
-            results.push(feature);
-          }
-        } 
-      } else if(queryString) {
-        for(var l in levels) {
-          for(var f in levels[l].geojson.features) {
-            var feature = levels[l].geojson.features[f];
-	    feature.level = levels[l].name;
-	    feature.properties.level = feature.level;
-	    feature.levelIndex = levels[l].levelIndex;
+    // center and zoom the view so that the given features are visible (if on the current floor!)
+    map.fitFeatures = function(feature) {
+      var _features;
+      if(feature.geometry) _features = [feature];
+      else _features = feature;
 
-            var match = false;
-	   
-            for(var parameter in feature.properties) {
-              if(queryString == feature.properties[parameter]) match = true;
-            }
-            if(match && (
-	      (feature.geometry.type == 'Polygon' && feature.geometry.coordinates[0].length > 0) ||
-	      (feature.geometry.type == 'Point' && feature.geometry.coordinates.length > 0))) {
-	      results.push(feature);
-	    }
-	  }
-        }
-      } else if(queryObject) {
-        var isRegexp = true;
- 	for(var i in queryObject) 
-	  isRegexp = false;
- 
-	if(isRegexp) {
-        for(var l in levels) {
-          for(var f in levels[l].geojson.features) {
-            var feature = levels[l].geojson.features[f];
-	    feature.level = levels[l].name;
-	    feature.properties.level = feature.level;
-	    feature.levelIndex = levels[l].levelIndex;
+      // TODO: add here a loop to build a bounding box of all given features
+      // TODO: now only using the first feature
 
-            var match = false;
-	   
-            for(var parameter in feature.properties) {
-              if((new String(feature.properties[parameter])).match(queryObject)) match = true;
-            }
-            if(match && (
-	      (feature.geometry.type == 'Polygon' && feature.geometry.coordinates[0].length > 0) ||
-	      (feature.geometry.type == 'Point' && feature.geometry.coordinates.length > 0))) {
-	      results.push(feature);
-	    }
-	  }
-        }
-	  
-
-	} else {
-          var parameters = queryObject;
-
-      for(var l in levels) {
-        for(var f in levels[l].geojson.features) {
-          var feature = levels[l].geojson.features[f];
-	  feature.level = feature.properties.level = levels[l].name;
-	  feature.levelIndex = levels[l].levelIndex;
-          var match = true;
-          for(var parameter in parameters) {
-	    if(!feature.properties[parameter]) match = false;
-            else {
-              if(typeof parameters[parameter] == 'string') {
-                if(feature.properties[parameter] != parameters[parameter]) match = false;
-              } else {
-                if(!(new String(feature.properties[parameter])).match(parameters[parameter])) match = false;
-              }
-            }
-          }
-            if(match && (
-	      (feature.geometry.type == 'Polygon' && feature.geometry.coordinates[0].length > 0) ||
-	      (feature.geometry.type == 'Point' && feature.geometry.coordinates.length > 0))) {
-	    results.push(feature);
-	  }
-	}
-      }
-        }
-      }
-      var finalResults = null;
-      if(iteratorFunction) {
-        finalResults = [];
-        for(var i=0;i<results.length;i++) {
-          if(iteratorFunction(results[i]) !== false) finalResults.push(results[i]);
-	  else continue;
-        }
-      } else {
-        finalResults = results;
-      }
-
-      return finalResults;
-   }
-   var mapInstanceId = parseInt(Math.random()*Math.pow(10, 10));
-
-   map.fitFeatures = function(feature) {
-     var _features;
-     if(feature.geometry) _features = [feature];
-     else _features = feature;
-     map.fitBounds(_features[0].geometry.coordinates);
-     map.setLevel(_features[0].properties.level);
-   }
+      map.fitBounds(_features[0].geometry.coordinates);
+      map.setLevel(_features[0].properties.level);
+    }
 
     map.clearHighlight = function(highlight) {
       var id = typeof highlight == 'string'? highlight : highlight.id;
 
-      if(highlights.specifiedAreas[id]) delete highlights.specifiedAreas[id];
-      if(highlights.areas[id]) delete highlights.areas[id];
+      if(highlights.features[id]) delete highlights.features[id];
       updateFeatures();
     }
 
-    var highlightCount = 0;
+    // this function features the given feature(s) with the given style (L.Path style)
     map.highlightFeatures = function(area, style) {
+      // for developer convenience; if the clickable property is not given, default it to false (opposed to the default true value in Leaflet)
       if(style.clickable == undefined) style.clickable = false;
+
+      // count the done highlights in order to provide an easy integer identifier to them
       highlightCount++;
       var id = highlightCount;
-//Math.floor(Math.random()*Math.pow(10, 10));      
-      highlights.specifiedAreas[id] = {id: id, feature: area, style: style};      
+
+      // append the to-be-highlighted features to the highlights.features property
+      highlights.features[id] = {id: id, feature: area, style: style};      
+
+      // call updateFeatures, which causes the highlights to be asynchronously refreshed
       updateFeatures();
-      return highlights.specifiedAreas[id];
+  
+      // return the highlight object, including the id property that may be used in future
+      return highlights.features[id];
     }
 
+    // this function removes all polygon/point highlights
     map.clearHighlights = function() {
       removeHighlightPolygons();
-      highlights.areas = {};
-      highlights.specifiedAreas = {};
+      highlights.features = {};
     }
 
+    // TODO: update this function to be 100% local, based on the georeferencing of the indoor map
+    // TODO: make the georeferencing points available here
     map.convertLatLng = function(latLng, callback) {
       if(virtualCoordinates) $.ajax({
         processData: false, 
@@ -759,7 +709,6 @@ L.indoor =
         callback(error);
       });
       else callback(null, new L.LatLng(latLng.lat, latLng.lng));
-
     }
 
     function removeHighlightPolygons() {
@@ -769,94 +718,87 @@ L.indoor =
 	}  
       }
       highlights.polygons = {};
-
-
     }
-  
+
+    // this function sets a timer to run _updateFeatures function; this is done this way to avoid 
+    // sequential feature updates from for loops etc.  
     function updateFeatures() {
       if(window.updateFeaturesTimer) clearTimeout(window.updateFeaturesTimer);
       window.updateFeaturesTimer = setTimeout(_updateFeatures, 1);
     }
 
+    // this is the real operational function to update the highlighted features
     function _updateFeatures() {
+      // this function hides those layers that aren't on the current level
       _updateLayers();
 
       removeHighlightPolygons();
-      for(var area in highlights.specifiedAreas) {
-	var highlight = highlights.specifiedAreas[area];
+
+      // this for loop goes through every highlight definition.
+      // if there are features to be shown on the current level, show them; else, don't.
+      for(var area in highlights.features) {
+	var highlight = highlights.features[area];
         var feature = highlight.feature;
+	
+	// convert the feature var to an array, if it wasn't already
 	var _features = [];
  	if(feature.geometry) _features.push(feature);
 	else _features = feature;
+
+	// then loop the array
 	for(var i=0;i<_features.length;i++) {
           var polygon = new L.Polygon(_features[i].geometry.coordinates, highlight.style);
 	  if(_features[i].levelIndex == currentLevel.levelIndex) {
 	    map.__indoor_addLayer(polygon); 
 	    polygon.bringToFront();
 	  } else {
-	    console.log('hidden polygon');
 	  }
           if(!highlights.polygons[currentLevel.levelIndex]) highlights.polygons[currentLevel.levelIndex] = [];
           highlights.polygons[currentLevel.levelIndex].push({feature: _features[i], polygon: polygon});
-	  
 	}
       }
-
-      for(var hili in highlights.areas) {
-        var highlight = highlights.areas[hili];
-
-        for(var f in currentLevel.geojson.features) {
-          var feature = currentLevel.geojson.features[f];
-          var match = true;
-          for(var parameter in highlight.parameters) {
-	    if(highlight.parameters[parameter] != feature.properties[parameter]) match = false;
-          }
-	  if(match && feature.geometry.coordinates[0].length > 0) {	
-
-	    var coordinates = [];
-//	    for(var i in feature.geometry.coordinates[0]) 
-  //  	      coordinates.push([feature.geometry.coordinates[0][i][1], feature.geometry.coordinates[0][i][0]]);	 
-	    var polygon = new L.Polygon(feature.geometry.coordinates, highlight.style).addTo(map).bringToFront();
-	    if(!highlights.polygons[currentLevel.levelIndex]) highlights.polygons[currentLevel.levelIndex] = [];
-	    highlights.polygons[currentLevel.levelIndex].push({feature: feature, polygon: polygon});
-	  }
-	  
-        }
-      }
-
     }
 
     function _setLevel(level) {
+      // ok, update the internal _level var now
       _level = level;
+
+      // if we're already on a level, hide it!
       if(currentLevel) {
         map.removeLayer(currentLevel.tileLayer);
 	map.removeLayer(currentLevel.gridLayer);
 	if(currentLevel.markerLayer && map.hasLayer(currentLevel.markerLayer)) map.removeLayer(currentLevel.markerLayer);
       }
  
+      // if there's a default level chooser element, update it accordingly
       $('#level_chooser a').attr('class', '');
       $('#level_chooser a[level='+level+']').attr('class', 'leaflet-disabled');
+
+      // define tile and grid layers 
       var tileLayer = L.mapbox.tileLayer(levels[level]);
       map.addLayer(tileLayer);
       var gridLayer = L.mapbox.gridLayer(levels[level]);
       map.addLayer(gridLayer);
+
+      // add a grid control to enable click and hover events
       map.addControl(L.indoor.gridControl(gridLayer, {click: _.click, hover: _.hover}));
+
+      // store the layer objects
       levels[level].gridLayer = gridLayer;
       levels[level].tileLayer = tileLayer;
       currentLevel = levels[level];
-      if(levels[level].geojson && markerFilterFunction) {
-//	levels[level].markerLayer = new L.mapbox.markerLayer(levels[level].geojson).on('click', function() {});
-//	levels[level].markerLayer.setFilter(markerFilterFunction).addTo(map);		 
-      }
-      try {
-        streetLayer.bringToBack();
-      } catch(e) {}
-     
+
+      // update features == hide features that are not on this level; show those that are     
       updateFeatures();
+
+      // if there are routes shown, update them as well
       updateRoutes();
+
+      // return the map object for coding convenience
       return map;
     }
 
+    // this internal function loops through the leaflet layers and hides those layers that have a level definition that is not the current level
     function _updateLayers() {
       for(var i in map._layers) {
 	if(map._layers[i]._latlng) {
@@ -877,33 +819,7 @@ L.indoor =
 	  }
 	}
       }
-
-
-
     }
-
-    map.setFeatureStyleFunction = function(filter) {
-      markerStyleFunction = filter;
-      if(currentLevel) {
-        var featureLayers = levels[map.getLevel()].markerLayer._layers;
-      for(var feature in featureLayers) {
-        markerStyleFunction(featureLayers[feature].feature, featureLayers[feature].options);
-      }
-	}
-    }
-
-    map.setMarkerFilterFunction = function(filter) {
-      markerFilterFunction = filter;
-      if(levels[map.getLevel()].geojson && markerFilterFunction) {
-	if(levels[map.getLevel()].markerLayer && map.hasLayer(levels[map.getLevel()].markerLayer)) {
-
-	} else {
-	  levels[map.getLevel()].markerLayer = new L.mapbox.markerLayer(levels[map.getLevel()].geojson).addTo(map);
-	}
-	levels[map.getLevel()].markerLayer.setFilter(markerFilterFunction);;		 
-      }
-    }
-
 
     map.getLevels = function() {
       var levelArray = [];
@@ -919,6 +835,7 @@ L.indoor =
       return _level;
     }     
 
+    // this function changes the shown indoor level. If the initialization is still ongoing, save the desired level and show it later
     map.setLevel = function(level) {
       if(levels[level] != undefined) {
         _setLevel(level);
@@ -926,9 +843,9 @@ L.indoor =
         targetLevel = level;
       }
     };
-    var levelControlSet = false;
+    
+    // this function shows or hides the default level control.
     map.toggleLevelControl = function(flag) {
-
 	    if( levelControl != flag || !levelControlSet ) {
 		levelControlSet = true;
 		if( flag ) {
@@ -1159,6 +1076,8 @@ L.indoor =
     map.getRoute = function(a, b, callback) {
       if(!routingId) callback('Routing not enabled on the specified map.');
 
+      // this hassle makes sure that coordinates do have lat, lng == lon, and level properties.
+      // the experience is that they are not always properly defined.  
       if(!a.level && a.l) a.level = a.l;
       if(!a.l && a.level) a.l = a.level;
       if(!b.level && b.l) b.level = b.l;
@@ -1216,170 +1135,177 @@ L.indoor =
       });
 
     }
-   function search(mapid, query, callback) {
-            function done(errmsg, result) {
-                if( callback ) {
-                    try {
-                        var cbfun = callback;
-                        callback = null;
-                        cbfun(errmsg, result);
-                    } catch(err) {}
-                }
-            }
+    function search(mapid, query, callback) {
+      function done(errmsg, result) {
+        if( callback ) {
+          try {
+            var cbfun = callback;
+            callback = null;
+            cbfun(errmsg, result);
+          } catch(err) {}
+        }
+      }
 
-            try {
-		var mapid = mapid ? mapid : _.project;
-                if( typeof mapid != 'string' ) {
-                    done('invalid map id');
-                    return;
-                }
-
-                if( typeof query == 'function' ) {
-                    callbackdone = callback;
-                    callback = query;
-                    query = {};
-                }
-
-                var str = '';
-                function parseQuery(obj, prefix) {
-                    if( typeof obj == 'object' ) {
-                        if( obj instanceof RegExp ) {
-                            if( str )
-                                str += '&'
-                            str += '.' + prefix + '=' + obj.toString();
-                        } else
-                            for( var ai in obj )
-                                parseQuery(obj[ai],
-                                           prefix ? prefix + '.' + ai : ai);
-                    } else if( typeof obj == 'string' ||
-                               typeof obj == 'number' ) {
-                        if( str )
-                            str += '&';
-                        str += '.' + prefix + '=' + obj;
-                    }
-                }
-                parseQuery(query, '');
-
-                $.getJSON(window.location.protocol+'//navi.indoor.io/navi/maps/' + _.project +
-                          '/search.jsonp?' + str +
-                          '&callback=?')
-                    .fail(function(jqXHR, textStatus, errorThrown) {
-                        done('error');
-                    })
-                    .done(function(data, textStatus, jqXHR) {
-                        done(null, data)
-                    });
-            } catch(err) {
-                done('error making request');
-            }
+      try {
+	var mapid = mapid ? mapid : _.project;
+        if( typeof mapid != 'string' ) {
+          done('invalid map id');
+          return;
+        }
+        if( typeof query == 'function' ) {
+          callbackdone = callback;
+          callback = query;
+          query = {};
         }
 
-
-     var loadedLevels = [];
-
-  map.parseUTFGridData = function(data) {
-        var featureIdentifier = data.id ? data.id :
-                                data['_featureIdentifier'];
-        var properties = {}
-        for(var d in data) {
-	  if(typeof data[d] == 'string' && data[d].length == 0) continue;
-          if(d == 'geometry') continue;
-          if(d == '_referenceLocation') {
-            var ref_loc = data['_referenceLocation'].split(',');
-            properties.markerLocation = new L.LatLng(ref_loc[1], ref_loc[0], "1");
-            continue;
+        var str = '';
+        function parseQuery(obj, prefix) {
+          if( typeof obj == 'object' ) {
+            if( obj instanceof RegExp ) {
+              if(str.length > 0)
+                str += '&';
+              str += '.' + prefix + '=' + obj.toString();
+            } else
+              for( var ai in obj )
+                parseQuery(obj[ai],
+                           prefix ? prefix + '.' + ai : ai);
+          } else if(typeof obj == 'string' ||
+                    typeof obj == 'number' ) {
+            if(str.length > 0)
+              str += '&';
+            str += '.' + prefix + '=' + obj;
           }
+        }
+        
+        parseQuery(query, '');
 
-          if(d == '_featureIdentifier') {
-            properties.featureIdentifier = data['_featureIdentifier'];
-            continue;
+        $.getJSON(window.location.protocol+'//navi.indoor.io/navi/maps/' + _.project +
+                  '/search.jsonp?' + str +
+                  '&callback=?')
+          .fail(function(jqXHR, textStatus, errorThrown) {
+            done('error');
+          })
+          .done(function(data, textStatus, jqXHR) {
+             done(null, data)
+          });
+      } catch(err) {
+        done('error making request');
+      }
+    }
+
+
+    var loadedLevels = [];
+
+    // this is a helper function to always provide the feature data in a consistent format
+    map.parseUTFGridData = function(data) {
+      var featureIdentifier = data.id ? data.id : data['_featureIdentifier'];
+      var properties = {}
+      for(var d in data) {
+	if(typeof data[d] == 'string' && data[d].length == 0) continue;
+        if(d == 'geometry') continue;
+        if(d == '_referenceLocation') {
+          var ref_loc = data['_referenceLocation'].split(',');
+          properties.markerLocation = new L.LatLng(ref_loc[1], ref_loc[0], "1");
+          continue;
+        }
+
+        if(d == '_featureIdentifier') {
+          properties.featureIdentifier = data['_featureIdentifier'];
+          continue;
+        }
+        properties[d] = data[d];
+      }
+
+      var feature = {
+        properties: properties, 
+        geometry: JSON.parse(data.geometry),
+        levelIndex: data.levelIndex ? data.levelIndex : 0
+      };
+      feature.properties.level = map.getLevels()[feature.levelIndex].name;	
+      if(feature.geometry.type == 'Polygon') {
+        var coords = feature.geometry.coordinates;
+        for(var i in coords)
+          for(var j in coords[i]) {
+            var coord = coords[i][j];
+            coords[i][j] = new L.indoor.latLng(coord[1], coord[0], "1");
           }
-          properties[d] = data[d];
-        }
+      }
+      return feature;
+    }
 
-        var feature = {properties: properties, geometry: JSON.parse(data.geometry),
-          levelIndex: data.levelIndex ? data.levelIndex : 0};
-	feature.properties.level = map.getLevels()[feature.levelIndex].name;	
-        if(feature.geometry.type == 'Polygon') {
-          var coords = feature.geometry.coordinates;
-          for(var i in coords)
-            for(var j in coords[i]) {
-              var coord = coords[i][j];
-              coords[i][j] = new L.indoor.latLng(coord[1], coord[0], "1");
-            }
-        }
-	return feature;
-  }
+    // this function is called when we've got a level-specific JSON
+    function levelJsonLoaded(data, project, index) {
+      if(data.bounds[0] == 0 && data.bounds[1] == 0) {
+        virtualCoordinates = true;
+      }
+      levels[data.name] = data;
+      levels[data.name].levelIndex = parseInt(index);	
+      levelIndex[levels[data.name].levelIndex] = levels[data.name];
 
+      loadedLevels[index] = data.name;
 
-     $.ajax({
-       dataType: 'jsonp',
-       jsonp: 'callback',
-       url: window.location.protocol+'//tile.indoor.io/export/web/'+_.map+'/'+_.project+'?callback=?'
-     }).done(function(project) {
-      if(typeof project == 'string') project = JSON.parse(project);
-      for(var i in project.levels) {
-	if(!routingId) routingId = project.levels[i].source;
+      // ok, then, count the levels 
+      var levelCount = 0;
+      for(var j in levels) {
+        levelCount++;
+      }
+      // if we've loaded all levels, let's go!
+      if(levelCount == project.levels.length) { 
+        loadedLevels.reverse();
+        map.toggleLevelControl(levelControl);
 
-        (function(i) { return function() {
- 	  loadedLevels.push({});
-          $.ajax({
+	mapDiv.hide().css('opacity', 1).fadeIn();
+
+	if(targetLevel != undefined && levels[targetLevel]) _setLevel(targetLevel);
+        else _setLevel(data.name);
+
+	if(!initialCenterSet) {
+	  map.setMaxBounds(new L.LatLngBounds(
+            new L.LatLng(data.bounds[1]-(data.bounds[3]-data.bounds[1])/2, 
+		         data.bounds[0]-(data.bounds[2]-data.bounds[0])/2), 
+            new L.LatLng(data.bounds[3]+(data.bounds[3]-data.bounds[1])/2, 
+			 data.bounds[2]+(data.bounds[2]-data.bounds[0])/2)));
+	  map.setView(new L.LatLng(data.center[1], data.center[0]), map.getMinZoom());
+	  initialCenterSet = true;
+	}
+	if(callback) {
+          callback(_.project, element);
+	}
+      }
+    }
+
+    // this function causes a level-specific JSON to be loaded
+    function levelLoadFunction(project, i) {
+      return function() {
+ 	loadedLevels.push({});
+        $.ajax({
             dataType: 'jsonp',
             jsonp: 'callback',
             url: window.location.protocol+'//tile.indoor.io/api/Tileset/'+project.levels[i].source+'?callback=?'
-          }).done((function(index) { return function(data) {
-/*            $.ajax({
-              dataType: 'jsonp',
-              jsonp: 'callback',
-              url: window.location.protocol+'//tile.indoor.io/export/web/'+_.map+'/'+project.levels[i].source+'/geojson.json'+'?callback=?'
-            }).done(function(geojson) {
-*/
-	      if(data.bounds[0] == 0 && data.bounds[1] == 0) {
-		virtualCoordinates = true;
-	      }
-	      levels[data.name] = data;
-              levels[data.name].levelIndex = parseInt(i);	
-	      levelIndex[levels[data.name].levelIndex] = levels[data.name];
-
-	      loadedLevels[index] = data.name;
-		var levelCount = 0;
-	     for(var j in levels) {
-		levelCount++;
-	     }
- 	    if(levelCount == project.levels.length) {
-		loadedLevels.reverse();
-		map.toggleLevelControl(levelControl);
-
-	      mapDiv.hide().css('opacity', 1).fadeIn();
-	      if(callback) {
-		callback(_.project, element);
-	      }
-	    }
-
-
-
-	    if(data.name == targetLevel && currentLevel == undefined) {
-   	      _setLevel(targetLevel);
-   	    } else if(targetLevel == undefined && currentLevel == undefined) {
-	      _setLevel(data.name);
-  	    }
-
-	    if(!initialCenterSet) {
-	      map.setMaxBounds(new L.LatLngBounds(new L.LatLng(data.bounds[1]-(data.bounds[3]-data.bounds[1])/2, 
-							       data.bounds[0]-(data.bounds[2]-data.bounds[0])/2), 
-						  new L.LatLng(data.bounds[3]+(data.bounds[3]-data.bounds[1])/2, 
-							       data.bounds[2]+(data.bounds[2]-data.bounds[0])/2)));
-	      map.setView(new L.LatLng(data.center[1], data.center[0]), map.getMinZoom());
-	      initialCenterSet = true;
-	    }
-
-	
-/*          });*/
- 	    }; })(i));
-
-        };})(i)();
+          })
+          .done(function(data) {
+ 	    levelJsonLoaded(data, project, i);
+          });
       }
-    });
+    }
+
+    // when we've got the project JSON that defines the levels, load each level
+    function projectJsonLoaded(project) {
+      if(typeof project == 'string') project = JSON.parse(project);
+      for(var i in project.levels) {
+	if(!routingId) routingId = project.levels[i].source;
+        levelLoadFunction(project, i)(); 
+      }
+    }
+
+    // this ajax call is the beginning of the map initialization!
+    $.ajax({
+       dataType: 'jsonp',
+       jsonp: 'callback',
+       url: window.location.protocol+'//tile.indoor.io/export/web/'+_.map+'/'+_.project+'?callback=?'
+      }).done(projectJsonLoaded);
+
+    // end of the L.indoor.map definition; return the map object that has all the functions defined above
     return map;
   }, gridControl: function(gridLayer, options) {
     var instance = new L.mapbox.gridControl(gridLayer);
@@ -1388,6 +1314,7 @@ L.indoor =
     }
     instance._show = function() {};
 
+    // override _click function if a new version of it is defined
     if(instance.options.click) instance._click = function(event) {
       event.latLng.level = map.getLevel();
       if(event.data && event.data['_featureIdentifier']) {
@@ -1396,6 +1323,8 @@ L.indoor =
       }
       this.options.click(event);
     };
+
+    // override _hover function if a new version of it is defined
     if(instance.options.hover) instance._mousemove = function(event) {
       event.latLng.level = map.getLevel();
       if(event.data && event.data['_featureIdentifier']) {
@@ -1406,9 +1335,8 @@ L.indoor =
     };
     return instance;
   }
-  
 };
 
-
-
+// trigger an 'indoorjs' event; there may be somebody listening to it
+// this event means just that indoor.js has been defined
 $(document).trigger('indoorjs');
