@@ -794,8 +794,8 @@ L.indoor =
     // TODO: update this function to be 100% local, based on the georeferencing of the indoor map
     // TODO: make the georeferencing points available here
     map.convertLatLng = function(latLng, callback) {
-      var maxc = 20037508.34;
       if(virtualCoordinates) {
+        var maxc = 20037508.34;
         var newCoords = L.indoor.coordinates.WGS84ToLocal(latLng.lat, latLng.lng, georeferences[0], georeferences[1]);
 	var bbox = project.boundingBox;
  	var rbbox = project.rotatedBoundingBox;
@@ -814,11 +814,47 @@ L.indoor =
       }
       else callback(null, new L.LatLng(latLng.lat, latLng.lng));
     }
+    var maxc = 20037508.34;
 
-    map.convertLatLngToWGS84 = function(x, y, callback) {
-      var newCoords = L.indoor.coordinates.localToWGS84(x, y, georeferences[0], georeferences[1]);
-	callback(null, new L.LatLng(newCoords.lat, newCoords.lon));
+    map.convertXyToLocalLatLng = function(x, y) {
+      return {lat: y/maxc*180, lng: x/maxc*180};
+    }
+
+    map.convertUpsideDownXyToLocalLatLng = function(x, y) {
+      return {lat: mapBounds.getNorthWest().lat - y/maxc*180, lng: x/maxc*180};
+    }
     
+
+    map.convertLocalLatLngToXy = function(latLng) {
+	var bbox = project.boundingBox;
+ 	var rbbox = project.rotatedBoundingBox;
+	var angle = project.rotation;
+
+	var newCoords = {x: rbbox.minx+latLng.lng/180*maxc, y: rbbox.miny+latLng.lat/180*maxc};
+
+	
+	var centerVector = {x: newCoords.x-(bbox.maxx+bbox.minx)/2, 
+			    y: newCoords.y-(bbox.maxy+bbox.miny)/2};
+	var rotatedCenterVector = IMath.rotateCCW(-angle, centerVector);
+					    
+	newCoords = {x: (bbox.maxx+bbox.minx)/2+rotatedCenterVector.x,
+		     y: (bbox.maxy+bbox.miny)/2+rotatedCenterVector.y,
+		     z: 0};
+	return newCoords;
+
+
+    }
+
+    map.convertLocalLatLngToStandardXy = function(latLng, callback) {
+
+    }
+
+    map.convertLocalLatLngToWGS84 = function(latLng, callback) {
+      if(virtualCoordinates) {
+	var coords = map.convertLocalLatLngToXy(latLng);
+        callback(null, L.indoor.coordinates.localToWGS84(coords.x, coords.y, georeferences[0], georeferences[1]));
+      }
+      else callback(null, new L.LatLng(latLng.lat, latLng.lng));
     }
 
     function removeHighlightPolygons() {
@@ -1343,15 +1379,18 @@ L.indoor =
       return feature;
     }
 
+    var mapBounds = null;
+
     // this function is called when we've got a level-specific JSON
     function levelJsonLoaded(data, project, index) {
       if(data.bounds[0] == 0 && data.bounds[1] == 0) {
         virtualCoordinates = true;
       }
+      mapBounds = data.bounds;
       levels[data.name] = data;
       levels[data.name].levelIndex = parseInt(index);	
       levelIndex[levels[data.name].levelIndex] = levels[data.name];
-
+      
       loadedLevels[index] = data.name;
 
       // ok, then, count the levels 
@@ -1370,12 +1409,32 @@ L.indoor =
         else _setLevel(data.name);
 
 	if(!initialCenterSet) {
-	  map.setMaxBounds(new L.LatLngBounds(
-            new L.LatLng(data.bounds[1]-(data.bounds[3]-data.bounds[1])/2, 
-		         data.bounds[0]-(data.bounds[2]-data.bounds[0])/2), 
-            new L.LatLng(data.bounds[3]+(data.bounds[3]-data.bounds[1])/2, 
-			 data.bounds[2]+(data.bounds[2]-data.bounds[0])/2)));
-	  map.setView(new L.LatLng(data.center[1], data.center[0]), map.getMinZoom());
+	  var bounds = new L.LatLngBounds(
+            new L.LatLng(data.bounds[1]-(data.bounds[3]-data.bounds[1])/2,
+                         data.bounds[0]-(data.bounds[2]-data.bounds[0])/2),
+            new L.LatLng(data.bounds[3]+(data.bounds[3]-data.bounds[1])/2,
+                         data.bounds[2]+(data.bounds[2]-data.bounds[0])/2));
+	  map.setMaxBounds(bounds);
+	  mapBounds = new L.LatLngBounds(
+            new L.LatLng(data.bounds[1],
+                         data.bounds[0]),
+            new L.LatLng(data.bounds[3], 
+                         data.bounds[2]));
+	  map.fitBounds(mapBounds);
+
+	  map.addEventListener('moveend', function(e) {
+	    var tl = mapBounds.getNorthWest();
+	    var br = mapBounds.getSouthEast();
+	    var mapCenter = map.getCenter();
+	    var targetLatLng = new L.LatLng(mapCenter.lat, mapCenter.lng);
+	    if(mapCenter.lat < br.lat) targetLatLng.lat = br.lat;
+	    if(mapCenter.lat > tl.lat) targetLatLng.lat = tl.lat;
+	    if(mapCenter.lng < tl.lng) targetLatLng.lng = tl.lng;
+	    if(mapCenter.lng > br.lng) targetLatLng.lng = br.lng;
+	    if(mapCenter.lat != targetLatLng.lat || mapCenter.lng != targetLatLng.lng) {
+	      map.panTo(targetLatLng);
+	    }
+	  });
 	  initialCenterSet = true;
 	}
 	if(callback) {
@@ -1383,6 +1442,8 @@ L.indoor =
 	}
       }
     }
+
+   
 
     // this function causes a level-specific JSON to be loaded
     function levelLoadFunction(project, i) {
@@ -1450,7 +1511,7 @@ L.indoor =
 };
 
 
-/** Proprietary code for coordinate conversions
+/** Minified code for coordinate conversions
 */
 
 var IMath=function(){function z(a,c,b,d){return Math.sqrt((a-b)*(a-b)+(c-d)*(c-d))}function y(a,c){if(a.z!==undefined&&c.z!==undefined)return Math.sqrt((a.x-c.x)*(a.x-c.x)+(a.y-c.y)*(a.y-c.y)+(a.z-c.z)*(a.z-c.z));return Math.sqrt((a.x-c.x)*(a.x-c.x)+(a.y-c.y)*(a.y-c.y))}function x(a,c){var b=Math.cos(a/180*Math.PI),d=Math.sin(a/180*Math.PI);return{x:c.x*b-c.y*d,y:c.x*d+c.y*b}}function s(a){for(var c=0,b=0;b<a.length;b++){var d=(b+1)%a.length;c+=a[b].position!==undefined?0.5*(a[b].position.x*a[d].position.y-
