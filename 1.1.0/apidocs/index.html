@@ -334,9 +334,13 @@ a 3D map to formats used by web maps. This identifier specifies a single result 
 <a id="guide-libs"></a>
 <h3>Including libraries</h3>
 <p>
+<div class="well" style="font-family: Arial;">indoor.js depends on jQuery. Please make sure you include jQuery on your page.</div>
 In order to use indoor.js, you have to include two libraries: mapbox.js and indoor.js. This can be done by adding the following
 lines to the &lt;head&gt; element of the HTML page:
 <div class="well">
+// jquery; please use jquery 1.9.1 or above<br/>
+&lt;link href='http://indoor.io/indoor.js/1.1.0/js/<b>jquery-1.9.1.min.js</b>' rel='stylesheet' /&gt;<br/>
+// map libraries<br/>
 &lt;link href='http://indoor.io/indoor.js/1.1.0/js/<b>mapbox/mapbox.css</b>' rel='stylesheet' /&gt;<br/>
 &lt;script src='http://indoor.io/indoor.js/1.1.0/js/<b>mapbox/mapbox.js</b>'>&lt;/script><br/>
 &lt;script src='http://indoor.io/indoor.js/1.1.0/js/<b>indoor.js</b>'&gt;&lt;/script&gt;<br/>
